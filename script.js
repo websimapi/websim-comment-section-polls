@@ -142,6 +142,20 @@ function Poll({ poll, comments }) {
     
     const totalVotes = Object.values(votes).reduce((sum, count) => sum + count, 0);
 
+    const handleVote = async (choice) => {
+        if (!isPollActive) return;
+        const voteString = `${id}:${choice}`;
+        try {
+            const result = await window.websim.postComment({ content: voteString });
+            if (result && result.error) {
+                 // Log error but don't alert, as user might have just cancelled.
+                console.warn('Could not post comment:', result.error);
+            }
+        } catch (error) {
+            console.error("Failed to initiate vote comment:", error);
+        }
+    };
+
     return (
         <div className="poll-container">
             <div className="poll">
@@ -157,8 +171,17 @@ function Poll({ poll, comments }) {
                         const choiceChar = optionChars[index];
                         const voteCount = votes[choiceChar] || 0;
                         const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+                        const canVote = isPollActive;
+
                         return (
-                            <div key={index} className="poll-option">
+                            <div 
+                                key={index} 
+                                className={`poll-option ${canVote ? 'votable' : ''}`}
+                                onClick={canVote ? () => handleVote(choiceChar) : undefined}
+                                role={canVote ? "button" : "status"}
+                                tabIndex={canVote ? "0" : "-1"}
+                                onKeyDown={canVote ? (e) => (e.key === 'Enter' || e.key === ' ') && handleVote(choiceChar) : undefined}
+                            >
                                 <div className="option-label">
                                     <span className="option-text">{choiceChar}. {option}</span>
                                     <span className="vote-percent">{voteCount} vote{voteCount !== 1 ? 's' : ''}</span>
@@ -174,7 +197,7 @@ function Poll({ poll, comments }) {
                 </div>
                 {isPollActive && (
                      <div className="vote-instructions">
-                        To vote, post a comment with <code>{id}:CHOICE</code> (e.g., <code>{id}:A</code>)
+                        To vote, click an option above or post a comment with <code>{id}:CHOICE</code> (e.g., <code>{id}:A</code>)
                     </div>
                 )}
             </div>
@@ -263,4 +286,3 @@ function App() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
-

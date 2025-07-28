@@ -133,6 +133,19 @@ h1, h2 {
     color: #65676b;
 }
 
+.poll-option.votable {
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 8px;
+    margin-left: -8px;
+    margin-right: -8px;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.poll-option.votable:hover {
+    background-color: #f0f2f5;
+}
+
 .progress-bar-container {
     background-color: #e4e6eb;
     border-radius: 6px;
@@ -175,4 +188,3 @@ h1, h2 {
     color: #65676b;
     padding: 20px;
 }
-
