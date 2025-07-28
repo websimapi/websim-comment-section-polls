@@ -1,10 +1,14 @@
-const { useState, useEffect, useMemo, useSyncExternalStore } = React;
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { WebsimSocket, useQuery } from '@websim/use-query';
+
+const { useState, useEffect, useMemo } = React;
 
 const room = new WebsimSocket();
 
 // --- Components ---
 
-function PollCreator({ creatorUsername }) {
+function PollCreator({ creatorUsername, existingPolls }) {
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '']);
     const [durationDays, setDurationDays] = useState(7);
@@ -27,25 +31,34 @@ function PollCreator({ creatorUsername }) {
         if (isSubmitting || !question.trim() || options.some(opt => !opt.trim())) return;
 
         setIsSubmitting(true);
+        const pollId = question.trim();
+
+        const isDuplicate = existingPolls.some(poll => poll.id === pollId);
+        if (isDuplicate) {
+            alert("A poll with this question already exists. Please use a unique question.");
+            setIsSubmitting(false);
+            return;
+        }
+
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + parseInt(durationDays, 10));
 
         try {
             const trimmedOptions = options.map(o => o.trim()).filter(o => o);
-            const newPoll = await room.collection('polls_v1').create({
-                question: question.trim(),
+            await room.collection('polls_v1').upsert({
+                id: pollId,
+                question: pollId,
                 options: trimmedOptions,
                 endDate: endDate.toISOString(),
                 creatorUsername,
             });
 
             // Suggest a comment announcing the new poll
-            const pollQuestionText = question.trim();
             const formattedOptions = trimmedOptions
-                .map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`)
+                .map((option, index) => `\`${pollId}:${String.fromCharCode(65 + index)}\` - ${option}`)
                 .join('\n');
             
-            const commentContent = `📊 **New Poll: ${pollQuestionText}**\n\n${formattedOptions}\n\nThis poll is now active! You can vote by clicking an option on the page, or by posting a comment with \`${newPoll.id}:CHOICE\` (e.g., \`${newPoll.id}:A\`).`;
+            const commentContent = `📊 **New Poll: ${pollId}**\n\n${formattedOptions}\n\nCopy \`(ID:CHOICE)\` and post in comments to vote.`;
 
             await window.websim.postComment({ content: commentContent });
 
@@ -68,7 +81,7 @@ function PollCreator({ creatorUsername }) {
             <form onSubmit={handleSubmit}>
                 <input
                     type="text"
-                    placeholder="Poll Question"
+                    placeholder="Poll Question (must be unique)"
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     required
@@ -116,7 +129,9 @@ function Poll({ poll, comments }) {
 
     const votes = useMemo(() => {
         const pollVotes = {}; // { username: { choice: 'A', date: '...' } }
-        const regex = new RegExp(`^${id}:([A-F])$`, 'i');
+        // Escape special regex characters from the poll ID (question)
+        const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`^${escapedId}:([A-F])$`, 'i');
         const pollStartDate = new Date(created_at);
         const pollEndDate = new Date(endDate);
         
@@ -222,10 +237,7 @@ function App() {
     const [creator, setCreator] = useState(null);
     const [project, setProject] = useState(null);
 
-    const polls = useSyncExternalStore(
-        room.collection('polls_v1').subscribe,
-        room.collection('polls_v1').getList
-    ) || [];
+    const { data: polls = [] } = useQuery(room.collection('polls_v1'));
     
     const [comments, setComments] = useState([]);
     const [loadingComments, setLoadingComments] = useState(true);
@@ -281,7 +293,7 @@ function App() {
     return (
         <div>
             <h1>📊 Comment Polls</h1>
-            {isCreator && <PollCreator creatorUsername={creator.username} />}
+            {isCreator && <PollCreator creatorUsername={creator.username} existingPolls={polls} />}
             
             <h2>Active & Past Polls</h2>
             {loadingComments && <p>Loading comments for voting...</p>}
@@ -296,5 +308,5 @@ function App() {
     );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const root = createRoot(document.getElementById('root'));
 root.render(<App />);
