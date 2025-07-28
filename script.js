@@ -224,7 +224,7 @@ function Poll({ poll, comments }) {
                 </div>
                 {isPollActive && (
                      <div className="vote-instructions">
-                        To vote, click an option above or post a comment with <code>{id}:CHOICE</code> (e.g., <code>{id}:A</code>)
+                        To vote, click an option above or post a comment with <code>{id}:CHOICE</code> (e.g., <code>{`${id}:A`}</code>)
                     </div>
                 )}
             </div>
