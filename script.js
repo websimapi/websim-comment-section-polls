@@ -31,12 +31,24 @@ function PollCreator({ creatorUsername }) {
         endDate.setDate(endDate.getDate() + parseInt(durationDays, 10));
 
         try {
-            await room.collection('polls_v1').create({
+            const trimmedOptions = options.map(o => o.trim()).filter(o => o);
+            const newPoll = await room.collection('polls_v1').create({
                 question: question.trim(),
-                options: options.map(o => o.trim()).filter(o => o),
+                options: trimmedOptions,
                 endDate: endDate.toISOString(),
                 creatorUsername,
             });
+
+            // Suggest a comment announcing the new poll
+            const pollQuestionText = question.trim();
+            const formattedOptions = trimmedOptions
+                .map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`)
+                .join('\n');
+            
+            const commentContent = `📊 **New Poll: ${pollQuestionText}**\n\n${formattedOptions}\n\nThis poll is now active! You can vote by clicking an option on the page, or by posting a comment with \`${newPoll.id}:CHOICE\` (e.g., \`${newPoll.id}:A\`).`;
+
+            await window.websim.postComment({ content: commentContent });
+
             setQuestion('');
             setOptions(['', '']);
             setDurationDays(7);
